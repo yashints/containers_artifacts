@@ -56,6 +56,7 @@ The value for a configuration variable may be specified via an environment varia
 | SQL_PASSWORD         | Yes      | ENV or File |               | The password for the SQL Server database.     |
 | SQL_SERVER           | Yes      | ENV or File |               | The server name for the SQL Server database.  |
 | SQL_DBNAME           | Yes      | ENV or File | mydrivingDB   | The name of the SQL Server database.          |
+| CREDENTIAL_METHOD           | No      | ENV or File | username_and_password   | Explicit credential process to access SQL DB. options: `username_and_password` or `token`       |
 | OPENAPI_DOCS_URI     | Yes      | ENV         |               | The external ip address and port of this api. This is used by the OpenAPI UI. |
 | DEBUG_LOGGING        | No       | ENV         | false         | Add debug logging.                            |
 
