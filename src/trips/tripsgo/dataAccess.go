@@ -11,7 +11,6 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/adal"
 	mssql "github.com/denisenkom/go-mssqldb"
-	// "github.com/Azure/go-autorest/autorest/azure/auth"
 )
 
 func getEnv(key, fallback string) string {
@@ -26,7 +25,7 @@ func writeConfigMessage(name string, value string, srcType string, src string) {
 	if value == "" {
 		msg = "no "
 	}
-	fmt.Printf("Config '%s' has %svalue set from %s '%s'.\n", name, msg, srcType, src)
+	fmt.Printf("Config '%s' has %s value set from %s '%s'.\n", name, msg, srcType, src)
 }
 
 func getConfigValue(name string, fallback string) string {
@@ -47,23 +46,26 @@ func getConfigValue(name string, fallback string) string {
 }
 
 var (
-	debug    = flag.Bool("debug", false, "enable debugging")
-	password = flag.String("password", getConfigValue("SQL_PASSWORD", "changeme"), "the database password")
-	user     = flag.String("user", getConfigValue("SQL_USER", "sqladmin"), "the database user")
-	port     = flag.Int("port", 1433, "the database port")
-	server   = flag.String("server", getConfigValue("SQL_SERVER", "changeme.database.windows.net"), "the database server")
-	database = flag.String("d", getConfigValue("SQL_DBNAME", "mydrivingDB"), "db_name")
-	// credential_method = flag.String("c", getConfigValue("CREDENTIAL_METHOD", "username_and_password"), "credential method") // username_and_password vs token (Be more explicit about it)
+	debug             = flag.Bool("debug", false, "enable debugging")
+	password          = flag.String("password", getConfigValue("SQL_PASSWORD", "changeme"), "the database password")
+	user              = flag.String("user", getConfigValue("SQL_USER", "sqladmin"), "the database user")
+	port              = flag.Int("port", 1433, "the database port")
+	server            = flag.String("server", getConfigValue("SQL_SERVER", "changeme.database.windows.net"), "the database server")
+	database          = flag.String("d", getConfigValue("SQL_DBNAME", "mydrivingDB"), "db_name")
+	credential_method = flag.String("c", getConfigValue("CREDENTIAL_METHOD", "username_and_password"), "method of authenticating into SQL DB")
+	clientId          = flag.String("i", getConfigValue("IDENTITY_CLIENT_ID", ""), "the  identity client id")
 )
 
 func getTokenProvider() (func() (string, error), error) {
-	msiEndpoint, err := adal.GetMSIEndpoint()
-	if err != nil {
-		return nil, err
+
+	options := adal.ManagedIdentityOptions{
+		ClientID: *clientId,
 	}
-	// scoped to the database.windows.net
-	msi, err := adal.NewServicePrincipalTokenFromMSI(
-		msiEndpoint, "https://database.windows.net/")
+
+	resource := "https://database.windows.net/"
+
+	msi, err := adal.NewServicePrincipalTokenFromManagedIdentity(resource, &options)
+
 	if err != nil {
 		return nil, err
 	}
@@ -77,10 +79,10 @@ func getTokenProvider() (func() (string, error), error) {
 
 func getDBConnection() (*sql.DB, error) {
 	var conn *sql.DB
-	credential_method := getConfigValue("CREDENTIAL_METHOD", "username_and_password") // not utilized elsewhere.
-	switch credential_method {
 
-	case "token":
+	switch *credential_method {
+
+	case "managed_identity":
 		connectionString := fmt.Sprintf("Server=%s;Database=%s", *server, *database)
 
 		tokenProvider, err := getTokenProvider()
@@ -90,7 +92,7 @@ func getDBConnection() (*sql.DB, error) {
 
 		accessTokenConnection, err := mssql.NewAccessTokenConnector(connectionString, tokenProvider)
 		if err != nil {
-			logError(err, "Error establishing DB connection using a token")
+			logError(err, "Error establishing DB connection using a managed identity")
 			return nil, err
 		}
 		conn = sql.OpenDB(accessTokenConnection)
